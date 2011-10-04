@@ -72,7 +72,7 @@ module ElasticSearchable
         scope = options.delete(:scope) || self
 
         records = scope.paginate(options)
-        while records.any? do
+        while records.first do
           ElasticSearchable.logger.debug "reindexing batch ##{records.current_page}..."
 
           actions = []
