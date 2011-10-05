@@ -10,7 +10,7 @@ module ElasticSearchable
 
   class ElasticError < StandardError; end
   class << self
-    attr_accessor :logger, :default_index, :offline
+    attr_accessor :logger, :default_index, :offline, :models
 
     # execute a block of work without reindexing objects
     def offline(&block)
