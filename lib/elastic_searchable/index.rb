@@ -12,6 +12,7 @@ module ElasticSearchable
       # configure the index for this type
       # http://www.elasticsearch.com/docs/elasticsearch/rest_api/admin/indices/put_mapping/
       def update_index_mapping
+        return nil unless single_index?
         if mapping = self.elastic_options[:mapping]
           ElasticSearchable.request :put, index_type_path('_mapping'), :json_body => {index_type => mapping}
         end
@@ -20,6 +21,7 @@ module ElasticSearchable
       # create the index
       # http://www.elasticsearch.org/guide/reference/api/admin-indices-create-index.html
       def create_index
+        return nil unless single_index?
         options = {}
         options.merge! :settings => self.elastic_options[:index_options] if self.elastic_options[:index_options]
         options.merge! :mappings => {index_type => self.elastic_options[:mapping]} if self.elastic_options[:mapping]
@@ -80,7 +82,7 @@ module ElasticSearchable
             next unless record.should_index?
             begin
               doc = ElasticSearchable.encode_json(record.as_json_for_index)
-              actions << ElasticSearchable.encode_json({:index => {'_index' => index_name, '_type' => index_type, '_id' => record.id}})
+              actions << ElasticSearchable.encode_json({:index => {'_index' => record.index_name, '_type' => index_type, '_id' => record.id}})
               actions << doc
             rescue => e
               ElasticSearchable.logger.warn "Unable to bulk index record: #{record.inspect} [#{e.message}]"
@@ -99,8 +101,13 @@ module ElasticSearchable
       end
 
       private
+      def single_index?
+        (self.elastic_options[:index] || ElasticSearchable.default_index).class != Proc
+      end
       def index_name
-        self.elastic_options[:index] || ElasticSearchable.default_index
+        name = self.elastic_options[:index] || ElasticSearchable.default_index
+        return "_all" if name.class == Proc
+        name
       end
       def index_type
         self.elastic_options[:type] || self.table_name
@@ -114,7 +121,7 @@ module ElasticSearchable
       def reindex(lifecycle = nil)
         query = {}
         query.merge! :percolate => "*" if _percolate_callbacks.any?
-        response = ElasticSearchable.request :put, self.class.index_type_path(self.id), :query => query, :json_body => self.as_json_for_index
+        response = ElasticSearchable.request :put, self.index_type_path(self.id), :query => query, :json_body => self.as_json_for_index
 
         self.index_lifecycle = lifecycle ? lifecycle.to_sym : nil
         _run_index_callbacks
@@ -139,9 +146,25 @@ module ElasticSearchable
       # can be done automatically when indexing using :percolate => true config option
       # http://www.elasticsearch.org/blog/2011/02/08/percolator.html
       def percolate
-        response = ElasticSearchable.request :get, self.class.index_type_path('_percolate'), :json_body => {:doc => self.as_json_for_index}
+        response = ElasticSearchable.request :get, self.index_type_path('_percolate'), :json_body => {:doc => self.as_json_for_index}
         self.percolations = response['matches'] || []
         self.percolations
+      end
+
+      # helper method to generate elasticsearch url for this object type
+      def index_type_path(action = nil)
+        index_path [self.class.send(:index_type), action].compact.join('/')
+      end
+
+      # helper method to generate elasticsearch url for this index
+      def index_path(action = nil)
+        ['', index_name, action].compact.join('/')
+      end
+
+      def index_name
+        name = self.class.elastic_options[:index] || ElasticSearchable.default_index
+        name = name.call(self) if name.class == Proc
+        name
       end
 
       private
