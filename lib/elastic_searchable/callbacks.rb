@@ -9,7 +9,7 @@ module ElasticSearchable
     module InstanceMethods
       private
       def delete_from_index
-        self.class.delete_id_from_index_backgrounded self.id
+        self.class.delete_id_from_index_backgrounded self.id, self.index_name
       end
       def update_index_on_create
         reindex :create

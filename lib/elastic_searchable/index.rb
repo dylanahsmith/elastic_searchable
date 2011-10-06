@@ -44,8 +44,9 @@ module ElasticSearchable
 
       # delete one record from the index
       # http://www.elasticsearch.com/docs/elasticsearch/rest_api/delete/
-      def delete_id_from_index(id)
-        ElasticSearchable.request :delete, index_type_path(id)
+      def delete_id_from_index(id, index_name=nil)
+        index_name ||= self.index_name
+        ElasticSearchable.request :delete, "/#{index_name}/#{index_type}/#{id}"
       rescue ElasticSearchable::ElasticError => e
         ElasticSearchable.logger.warn e
       end
