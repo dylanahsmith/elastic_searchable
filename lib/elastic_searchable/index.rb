@@ -71,12 +71,14 @@ module ElasticSearchable
       # TODO: move this to AREL relation to remove the options scope param
       def reindex(options = {})
         self.update_index_mapping
-        options.reverse_merge! :page => 1, :per_page => 1000, :total_entries => 1
+        options = options.dup
+        options[:batch_size] = options.delete(:per_page) if options[:per_page]
         scope = options.delete(:scope) || self
 
-        records = scope.paginate(options)
-        while records.first do
-          ElasticSearchable.logger.debug "reindexing batch ##{records.current_page}..."
+        batch_i = 0
+        scope.find_in_batches(options) do |records|
+          batch_i += 1
+          ElasticSearchable.logger.debug "reindexing batch ##{batch_i}..."
 
           actions = []
           records.each do |record|
@@ -95,9 +97,6 @@ module ElasticSearchable
             ElasticSearchable.logger.warn "Error indexing batch ##{options[:page]}: #{e.message}"
             ElasticSearchable.logger.warn e
           end
-
-          options.merge! :page => (records.current_page + 1)
-          records = scope.paginate(options)
         end
       end
 
