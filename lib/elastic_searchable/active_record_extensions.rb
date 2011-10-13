@@ -34,8 +34,8 @@ module ElasticSearchable
       include ElasticSearchable::Indexing::InstanceMethods
       include ElasticSearchable::Callbacks::InstanceMethods
 
-      ElasticSearchable.models ||= []
-      ElasticSearchable.models <<= self
+      ElasticSearchable.models ||= {}
+      ElasticSearchable.models[index_type] = self
 
       backgrounded :update_index_on_create => ElasticSearchable::Callbacks.backgrounded_options, :update_index_on_update => ElasticSearchable::Callbacks.backgrounded_options
       class << self
