@@ -68,8 +68,9 @@ module ElasticSearchable
       end
       objects_by_type = {}
       ids_by_type.each do |index_type, resource_ids|
+        model = ElasticSearchable.models[index_type]
         objects_by_id = {}
-        ElasticSearchable.models[index_type].find(resource_ids).each do |result|
+        model.where(model.primary_key => resource_ids).each do |result|
           objects_by_id[result.id] = result
         end
         objects_by_type[index_type] = objects_by_id
